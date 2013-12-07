@@ -102,11 +102,13 @@
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\Resources\classic.fx">
-      <DeploymentContent>false</DeploymentContent>
+    <FxCompile Include="..\Resources\Shaders\classic.fx">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">VertexMain</EntryPointName>
     </FxCompile>
-    <FxCompile Include="..\Resources\lights.fx">
+    <FxCompile Include="..\Resources\Shaders\lights.fx">
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">VertexMain</EntryPointName>
+    </FxCompile>
+    <FxCompile Include="..\Resources\Shaders\water.fx">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">VertexMain</EntryPointName>
     </FxCompile>
   </ItemGroup>
