@@ -279,8 +279,71 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 	pMapIndexBuffer->Unlock();
 
-	// Simple shader
-	LPCWSTR pFxFile = L"../Resources/shader.fx";
+	/** Vertex & Index buffers (Water) **/
+	// Vertex buffer
+	int waterHeight = 10;
+	IDirect3DVertexBuffer9* pWaterVertexBuffer;
+	device->CreateVertexBuffer((m_sizeX * m_sizeZ) * sizeof(Vertex), 0, 0, D3DPOOL_DEFAULT, &pWaterVertexBuffer, NULL);
+
+	Vertex* pWaterVertexData;
+
+	pWaterVertexBuffer->Lock(0, 0, (void**) &pWaterVertexData, 0);
+
+	i = 0;
+	for (int z = 0; z < m_sizeX; z++)
+	{
+		for (int x = 0; x < m_sizeZ; x++)
+		{
+			i = z + (m_sizeX * x);
+			float heightValue = m_height[z + (m_sizeX * x)];
+
+			pWaterVertexData[i].Position = D3DXVECTOR3(z, waterHeight, x);
+			pWaterVertexData[i].TextCoord = D3DXVECTOR2(((float) z / (float) m_sizeX), 1 - ((float) x / (float) m_sizeZ));
+
+			// Normals
+			pWaterVertexData[i].Normal.x = 0.0f;
+			pWaterVertexData[i].Normal.y = 0.0f;
+			pWaterVertexData[i].Normal.z = 0.0f;
+		}
+	}
+
+	pWaterVertexBuffer->Unlock();
+
+	// Index buffer
+	IDirect3DIndexBuffer9* pWaterIndexBuffer;
+	device->CreateIndexBuffer(6 * (m_sizeX * m_sizeZ) * sizeof(int), 0, D3DFMT_INDEX32, D3DPOOL_DEFAULT, &pWaterIndexBuffer, NULL);
+
+	int* pWaterIndexData;
+	pWaterIndexBuffer->Lock(0, 0, (void**) &pWaterIndexData, 0);
+
+
+	counter = 0;
+	for (int y = 0; y < m_sizeZ - 1; y++)
+	{
+		for (int x = 0; x < m_sizeX - 1; x++)
+		{
+			// First triangle
+			pWaterIndexData[counter] = x + (m_sizeX * (y + 1));
+			counter++;
+			pWaterIndexData[counter] = (x + 1) + (m_sizeX * y);
+			counter++;
+			pWaterIndexData[counter] = x + (m_sizeX * y);
+			counter++;
+
+			// Second triangle
+			pWaterIndexData[counter] = (x + 1) + (m_sizeX * (y + 1));
+			counter++;
+			pWaterIndexData[counter] = (x + 1) + (m_sizeX * y);
+			counter++;
+			pWaterIndexData[counter] = x + (m_sizeX * (y + 1));
+			counter++;
+		}
+	}
+
+	pWaterIndexBuffer->Unlock();
+
+	// Classic shader
+	LPCWSTR pFxFile = L"../Resources/classic.fx";
 	LPD3DXEFFECT pEffect;
 	LPD3DXBUFFER CompilationErrors;
 
@@ -294,7 +357,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	D3DXHANDLE hTexture = pEffect->GetParameterByName(NULL, "Texture");
 
 	// Shader with lights
-	LPCWSTR pFxFileLights = L"../Resources/shader_lights.fx";
+	LPCWSTR pFxFileLights = L"../Resources/lights.fx";
 	LPD3DXEFFECT pEffectLights;
 
 	if (D3D_OK != D3DXCreateEffectFromFile(device, pFxFileLights, NULL, NULL, 0, NULL, &pEffectLights, &CompilationErrors))
@@ -311,6 +374,9 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	D3DXHANDLE hOmniLightPosition = pEffectLights->GetParameterByName(NULL, "OmniLightPosition");
 	D3DXHANDLE hOmniLightColor = pEffectLights->GetParameterByName(NULL, "OmniLightColor");
 	D3DXHANDLE hOmniLightDistance = pEffectLights->GetParameterByName(NULL, "OmniLightDistance");
+
+	// Shader for water
+
 
 	PeekMessage(&oMsg, NULL, 0, 0, PM_NOREMOVE);
 	while (oMsg.message != WM_QUIT)
@@ -341,7 +407,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			{
 				enableLights = !enableLights;
 			}
-
 
 			// Move camera direction
 
@@ -452,6 +517,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			// Set device vertex declaration
 			device->SetVertexDeclaration(pDecl);
 
+			unsigned int cPasses, iPass;
+
 			// Draw without lights
 			if (!enableLights)
 			{
@@ -463,11 +530,25 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 				pEffect->SetVector(hCameraDirection, new D3DXVECTOR4(CameraDirection, 0));
 
-				unsigned int cPasses, iPass;
-
 				// Draw map
 				device->SetStreamSource(0, pMapVertexBuffer, 0, sizeof(Vertex));
 				device->SetIndices(pMapIndexBuffer);
+
+				cPasses = 0, iPass = 0;
+				pEffect->Begin(&cPasses, 0);
+				for (iPass = 0; iPass < cPasses; ++iPass)
+				{
+					pEffect->BeginPass(iPass);
+					pEffect->CommitChanges();
+
+					device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 2 * (m_sizeX * m_sizeZ), 0, 2 * ((m_sizeX * m_sizeZ) - 1));
+
+					pEffect->EndPass();
+				}
+
+				// Draw Water
+				device->SetStreamSource(0, pWaterVertexBuffer, 0, sizeof(Vertex));
+				device->SetIndices(pWaterIndexBuffer);
 
 				cPasses = 0, iPass = 0;
 				pEffect->Begin(&cPasses, 0);
@@ -503,8 +584,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 				pEffectLights->SetVectorArray(hOmniLightColor, omniLightColors, 1);
 				pEffectLights->SetFloat(hOmniLightDistance, omniLightDistance);
 
-				unsigned int cPasses, iPass;
-
 				// Draw map
 				device->SetStreamSource(0, pMapVertexBuffer, 0, sizeof(Vertex));
 				device->SetIndices(pMapIndexBuffer);
@@ -521,8 +600,26 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 					pEffectLights->EndPass();
 				}
 
+				// Draw Water
+				device->SetStreamSource(0, pWaterVertexBuffer, 0, sizeof(Vertex));
+				device->SetIndices(pWaterIndexBuffer);
+
+				cPasses = 0, iPass = 0;
+				pEffectLights->Begin(&cPasses, 0);
+				for (iPass = 0; iPass < cPasses; ++iPass)
+				{
+					pEffectLights->BeginPass(iPass);
+					pEffectLights->CommitChanges();
+
+					device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 2 * (m_sizeX * m_sizeZ), 0, 2 * ((m_sizeX * m_sizeZ) - 1));
+
+					pEffectLights->EndPass();
+				}
+
 				pEffectLights->End();
 			}
+
+			pEffect->End();
 
 			device->EndScene();
 			device->Present(NULL, NULL, NULL, NULL);
