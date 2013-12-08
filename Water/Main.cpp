@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "d3d9.h"
 #include "d3dx9.h"
-#include "Main.h"
 #include <math.h>
 #include "InputManager.h"
 
@@ -72,7 +71,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	_inputManager = new InputManager();
 	_inputManager->Create(hInstance, hWnd);
 
-	D3DCOLOR backgroundColor = D3DCOLOR_RGBA(0, 0, 0, 0);
+	D3DCOLOR backgroundColor = D3DCOLOR_RGBA(255, 0, 0, 0);
 	DWORD fillMode = D3DFILL_SOLID;
 
 	// Lights
@@ -110,7 +109,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	D3DXVECTOR3 CameraPosition(0.f, 0.f, -1.f);
 	D3DXVECTOR3 CameraDirection(0.f, 0.f, 1.f);
 
-	D3DXVECTOR3 At(0.f, 0.f, 0.f);
+	D3DXVECTOR3 At;
 	D3DXVECTOR3 Up(0.f, 1.f, 0.f);
 
 	// Projection matrix
@@ -119,6 +118,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	float fovy = D3DX_PI / 4; // pi / 2
 	D3DXMatrixPerspectiveFovLH(&Projection, fovy, 1.3f, 0.1f, 1000.0f);
 
+	D3DXMATRIX ReflectionMatrix;
 
 	// Création de l’interface DirectX 9
 	LPDIRECT3D9 pD3D = Direct3DCreate9(D3D_SDK_VERSION);
@@ -284,10 +284,11 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	LPCWSTR pWaterTextureFile = L"../Resources/water.dds";
 
 	LPDIRECT3DTEXTURE9 pWaterTexture;
+	LPDIRECT3DTEXTURE9 pReflectionTexture;
 	D3DXCreateTextureFromFile(device, pWaterTextureFile, &pWaterTexture);
 
 	// Vertex buffer
-	int waterHeight = 10;
+	int waterHeight = 20;
 	IDirect3DVertexBuffer9* pWaterVertexBuffer;
 	device->CreateVertexBuffer((m_sizeX * m_sizeZ) * sizeof(Vertex), 0, 0, D3DPOOL_DEFAULT, &pWaterVertexBuffer, NULL);
 
@@ -391,8 +392,13 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			CompilationErrors->GetBufferPointer(), "Error", 0);
 	}
 
-	D3DXHANDLE hWorldViewProjWater = pEffectWater->GetParameterByName(NULL, "WorldViewProj");
+	D3DXHANDLE hWorldMatrixWater = pEffectWater->GetParameterByName(NULL, "WorldMatrix");
+	D3DXHANDLE hViewMatrixWater = pEffectWater->GetParameterByName(NULL, "ViewMatrix");
+	D3DXHANDLE hProjectionMatrixWater = pEffectWater->GetParameterByName(NULL, "ProjectionMatrix");
+	D3DXHANDLE hWorldViewProjMatrixWater = pEffectWater->GetParameterByName(NULL, "WorldViewProjMatrix");
+	D3DXHANDLE hReflectionMatrixWater = pEffectWater->GetParameterByName(NULL, "ReflectionMatrix");
 	D3DXHANDLE hTextureNormalWater = pEffectWater->GetParameterByName(NULL, "NormalTexture");
+	D3DXHANDLE hTextureReflectedWater = pEffectWater->GetParameterByName(NULL, "ReflectedTexture");
 
 	PeekMessage(&oMsg, NULL, 0, 0, PM_NOREMOVE);
 	while (oMsg.message != WM_QUIT)
@@ -524,6 +530,17 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			D3DXMatrixLookAtLH(&View, &CameraPosition, &At, &Up);
 			D3DXMatrixIdentity(&World);
 
+			// Reflection matrix
+			D3DXVECTOR3 CameraPositionReflected = CameraPosition;
+			D3DXVECTOR3 CameraDirectionReflected = CameraDirection;
+			CameraPositionReflected.y = -CameraPositionReflected.y + (waterHeight * 1);
+			CameraDirectionReflected.y = CameraDirectionReflected.y + (waterHeight * 1);
+			D3DXVECTOR3 AtReflected = CameraPositionReflected + CameraDirectionReflected;
+			D3DXVECTOR3 UpReflected(0, 1, 1);
+			D3DXMatrixLookAtLH(&ReflectionMatrix, &CameraPositionReflected, &AtReflected, &Up);
+
+			D3DXMATRIX WorldViewProjReflected = World * ReflectionMatrix * Projection;
+
 			WorldViewProj = World * View * Projection;
 
 			// Do a lot of thing like draw triangles with DirectX
@@ -534,6 +551,80 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			device->SetVertexDeclaration(pDecl);
 
 			unsigned int cPasses, iPass;
+
+			LPDIRECT3DSURFACE9 savedRenderTarget;
+			LPDIRECT3DSURFACE9 reflectionRenderTarget;
+
+			// Create reflected texture
+			device->CreateTexture(m_sizeX, m_sizeZ, 0, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pReflectionTexture, NULL);
+			pReflectionTexture->GetSurfaceLevel(0, &reflectionRenderTarget);
+			device->GetRenderTarget(0, &savedRenderTarget);
+
+			device->SetRenderTarget(0, reflectionRenderTarget);
+			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
+
+
+			// "Send" WorldViewProj matrix to shader
+			pEffect->SetMatrix(hWorldViewProj, &WorldViewProjReflected);
+
+			// Set texture
+			pEffect->SetTexture(hTexture, pTexture);
+
+			pEffect->SetVector(hCameraDirection, new D3DXVECTOR4(CameraDirectionReflected, 0));
+
+			// Draw map
+			device->SetStreamSource(0, pMapVertexBuffer, 0, sizeof(Vertex));
+			device->SetIndices(pMapIndexBuffer);
+
+			cPasses = 0, iPass = 0;
+			pEffect->Begin(&cPasses, 0);
+			for (iPass = 0; iPass < cPasses; ++iPass)
+			{
+				pEffect->BeginPass(iPass);
+				pEffect->CommitChanges();
+
+				device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 2 * (m_sizeX * m_sizeZ), 0, 2 * ((m_sizeX * m_sizeZ) - 1));
+
+				pEffect->EndPass();
+			}
+
+			pEffect->End();
+
+			device->SetRenderTarget(0, savedRenderTarget);
+
+			void *pContainer;
+			HRESULT hr = reflectionRenderTarget->GetContainer(IID_IDirect3DTexture9, &pContainer);
+			if (SUCCEEDED(hr) && pContainer)
+			{
+				pReflectionTexture = (IDirect3DTexture9 *) pContainer;
+			}
+
+
+			// Draw Water
+			pEffectWater->SetMatrix(hWorldViewProjMatrixWater, &WorldViewProj);
+			pEffectWater->SetMatrix(hWorldMatrixWater, &World);
+			pEffectWater->SetMatrix(hViewMatrixWater, &View);
+			pEffectWater->SetMatrix(hProjectionMatrixWater, &Projection);
+			pEffectWater->SetMatrix(hReflectionMatrixWater, &ReflectionMatrix);
+			pEffectWater->SetTexture(hTexture, pWaterTexture);
+			pEffectWater->SetTexture(hTextureReflectedWater, pReflectionTexture);
+
+			device->SetStreamSource(0, pWaterVertexBuffer, 0, sizeof(Vertex));
+			device->SetIndices(pWaterIndexBuffer);
+
+			cPasses = 0, iPass = 0;
+			pEffectWater->Begin(&cPasses, 0);
+			for (iPass = 0; iPass < cPasses; ++iPass)
+			{
+				pEffectWater->BeginPass(iPass);
+				pEffectWater->CommitChanges();
+
+				device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 2 * (m_sizeX * m_sizeZ), 0, 2 * ((m_sizeX * m_sizeZ) - 1));
+
+				pEffectWater->EndPass();
+			}
+
+			pEffectWater->End();
 
 			// Draw without lights
 			if (!enableLights)
@@ -603,29 +694,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 				pEffectLights->End();
 			}
 
-			
-
-
-			// Draw Water
-			pEffectLights->SetMatrix(hWorldViewProjWater, &WorldViewProj);
-			pEffectWater->SetTexture(hTexture, pWaterTexture);
-
-			device->SetStreamSource(0, pWaterVertexBuffer, 0, sizeof(Vertex));
-			device->SetIndices(pWaterIndexBuffer);
-
-			cPasses = 0, iPass = 0;
-			pEffectWater->Begin(&cPasses, 0);
-			for (iPass = 0; iPass < cPasses; ++iPass)
-			{
-				pEffectWater->BeginPass(iPass);
-				pEffectWater->CommitChanges();
-
-				device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 2 * (m_sizeX * m_sizeZ), 0, 2 * ((m_sizeX * m_sizeZ) - 1));
-
-				pEffectWater->EndPass();
-			}
-
-			pEffectWater->End();
 
 			device->EndScene();
 			device->Present(NULL, NULL, NULL, NULL);
