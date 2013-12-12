@@ -1,4 +1,3 @@
-shared matrix WorldViewProjMatrix;
 shared matrix WorldMatrix;
 shared matrix ViewMatrix;
 shared matrix ProjectionMatrix;
@@ -40,7 +39,6 @@ PixelInputType VertexMain(VertexInputType input)
 	PixelInputType output;
 
 	matrix reflectProjectWorld;
-	matrix viewProjectWorld;
 	
 	// Change the position vector to be 4 units for proper matrix calculations.
 	float4 position = float4(input.Position, 1.0f);
@@ -65,11 +63,12 @@ PixelInputType VertexMain(VertexInputType input)
 
 float4 PixelMain(PixelInputType input) : COLOR0
 {
+	float4 textureColor;
 	float2 reflectTexCoord;
 	float4 reflectionColor;
 	float4 color;
 
-	float4 textureColor = tex2D(MapSampler, input.UV);
+	textureColor = tex2D(MapSampler, input.UV);
 
 	// Calculate the projected reflection texture coordinates.
 	reflectTexCoord.x = input.ReflectionPosition.x / input.ReflectionPosition.w / 2.0f + 0.5f;

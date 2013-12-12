@@ -107,6 +107,9 @@
     <FxCompile Include="..\Resources\Shaders\lights.fx">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">VertexMain</EntryPointName>
     </FxCompile>
+    <FxCompile Include="..\Resources\Shaders\refraction.fx">
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">VertexMain</EntryPointName>
+    </FxCompile>
     <FxCompile Include="..\Resources\Shaders\water.fx">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">VertexMain</EntryPointName>
     </FxCompile>

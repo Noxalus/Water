@@ -24,5 +24,8 @@
     <FxCompile Include="..\Resources\Shaders\water.fx">
       <Filter>Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="..\Resources\Shaders\refraction.fx">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

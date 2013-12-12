@@ -71,15 +71,18 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	_inputManager = new InputManager();
 	_inputManager->Create(hInstance, hWnd);
 
-	D3DCOLOR backgroundColor = D3DCOLOR_RGBA(255, 0, 0, 0);
+	D3DCOLOR backgroundColor = D3DCOLOR_RGBA(0, 0, 0, 0);
 	DWORD fillMode = D3DFILL_SOLID;
 
 	// Lights
 	bool enableLights = true;
 
+	// Ambiant light
+	D3DXVECTOR4 ambientColor = D3DXVECTOR4(0, 0, 0, 0);
+
 	// Directional light
-	D3DXVECTOR3 directionalLightDirection = D3DXVECTOR3(-1, 0, 0);
-	D3DXVECTOR4 directionalLightColor = D3DXVECTOR4(255, 255, 255, 0);
+	D3DXVECTOR3 lightDirection = D3DXVECTOR3(-1, 0, 0);
+	D3DXVECTOR4 diffuseColor = D3DXVECTOR4(255, 255, 255, 0);
 
 	// Omni light
 	D3DXVECTOR4 *omniLightPositions = new D3DXVECTOR4[1]{ D3DXVECTOR4(0, 15, 10, 0) };
@@ -144,6 +147,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	IDirect3DDevice9 *device;
 	pD3D->CreateDevice(0, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &device);
 
+	/*
+	// Nvidia debug
 	D3DDEVTYPE DeviceType = D3DDEVTYPE_HAL;
 	int num_card = 0;
 	// Look for 'NVIDIA PerfHUD' adapter
@@ -161,6 +166,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			break;
 		}
 	}
+	*/
 
 	//Create and fill other DirectX Stuffs like Vertex/Index buffer, shaders  
 
@@ -180,10 +186,10 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	//device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 
 	// Load texture
-	LPCWSTR pMapTexture = L"../Resources/terraintexture.jpg";
+	LPCWSTR pTextureFile = L"../Resources/terraintexture.jpg";
 
 	LPDIRECT3DTEXTURE9 pTexture;
-	D3DXCreateTextureFromFile(device, pMapTexture, &pTexture);
+	D3DXCreateTextureFromFile(device, pTextureFile, &pTexture);
 
 	/** Vertex & Index buffers (Heightmap) **/
 	// Load height map
@@ -288,7 +294,10 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	D3DXCreateTextureFromFile(device, pWaterTextureFile, &pWaterTexture);
 
 	// Vertex buffer
+	// Water height
 	int waterHeight = 20;
+	// Setup a clipping plane based on the height of the water to clip everything above it.
+	D3DXVECTOR4 clipPlane = D3DXVECTOR4(0.0f, -1.0f, 0.0f, waterHeight + 0.1f);
 	IDirect3DVertexBuffer9* pWaterVertexBuffer;
 	device->CreateVertexBuffer((m_sizeX * m_sizeZ) * sizeof(Vertex), 0, 0, D3DPOOL_DEFAULT, &pWaterVertexBuffer, NULL);
 
@@ -376,11 +385,31 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	D3DXHANDLE hWorldViewProjLights = pEffectLights->GetParameterByName(NULL, "WorldViewProj");
 	D3DXHANDLE hTextureLights = pEffectLights->GetParameterByName(NULL, "Texture");
 	D3DXHANDLE hDirectionalLightColor = pEffectLights->GetParameterByName(NULL, "DirectionalLightColor");
-	D3DXHANDLE hDirectionalLightDirection = pEffectLights->GetParameterByName(NULL, "DirectionalLightDirection");
+	D3DXHANDLE hlightDirection = pEffectLights->GetParameterByName(NULL, "lightDirection");
 	D3DXHANDLE hCameraDirection = pEffectLights->GetParameterByName(NULL, "CameraDirection");
 	D3DXHANDLE hOmniLightPosition = pEffectLights->GetParameterByName(NULL, "OmniLightPosition");
 	D3DXHANDLE hOmniLightColor = pEffectLights->GetParameterByName(NULL, "OmniLightColor");
 	D3DXHANDLE hOmniLightDistance = pEffectLights->GetParameterByName(NULL, "OmniLightDistance");
+
+	// Shader for refraction
+	LPCWSTR pFxFileRefraction = L"../Resources/Shaders/refraction.fx";
+	LPD3DXEFFECT pEffectRefraction;
+
+	if (D3D_OK != D3DXCreateEffectFromFile(device, pFxFileRefraction, NULL, NULL, 0, NULL, &pEffectRefraction, &CompilationErrors))
+	{
+		MessageBoxA(NULL, (char *)
+			CompilationErrors->GetBufferPointer(), "Error", 0);
+	}
+
+	D3DXHANDLE hWorldViewProjMatrixRefraction = pEffectRefraction->GetParameterByName(NULL, "WorldViewProjMatrix");
+	D3DXHANDLE hWorldMatrixRefraction = pEffectRefraction->GetParameterByName(NULL, "WorldMatrix");
+	D3DXHANDLE hViewMatrixRefraction = pEffectRefraction->GetParameterByName(NULL, "ViewMatrix");
+	D3DXHANDLE hProjectionMatrixRefraction = pEffectRefraction->GetParameterByName(NULL, "ProjectionMatrix");
+	D3DXHANDLE hShaderTextureRefraction = pEffectRefraction->GetParameterByName(NULL, "ShaderTexture");
+	D3DXHANDLE hAmbiantColorRefraction = pEffectRefraction->GetParameterByName(NULL, "AmbiantColor");
+	D3DXHANDLE hDiffuseColorRefraction = pEffectRefraction->GetParameterByName(NULL, "DiffuseColor");
+	D3DXHANDLE hLightDirectionRefraction = pEffectRefraction->GetParameterByName(NULL, "LightDirection");
+	D3DXHANDLE hClipPlaneRefraction = pEffectRefraction->GetParameterByName(NULL, "ClipPlane");
 
 	// Shader for water
 	LPCWSTR pFxFileWater = L"../Resources/Shaders/water.fx";
@@ -410,7 +439,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		}
 		else
 		{
-			// Update the input state
+			// Input management
 			_inputManager->Manage();
 
 			// Wireframe ?
@@ -500,30 +529,31 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			// Move the sun
 			if (_inputManager->IsKeyDone(DIK_NUMPAD4))
 			{
-				directionalLightDirection.x -= 0.1f;
+				lightDirection.x -= 0.1f;
 			}
 			if (_inputManager->IsKeyDone(DIK_NUMPAD6))
 			{
-				directionalLightDirection.x += 0.1f;
+				lightDirection.x += 0.1f;
 			}
 			if (_inputManager->IsKeyDone(DIK_NUMPAD5))
 			{
-				directionalLightDirection.y -= 0.1f;
+				lightDirection.y -= 0.1f;
 			}
 			if (_inputManager->IsKeyDone(DIK_NUMPAD8))
 			{
-				directionalLightDirection.y += 0.1f;
+				lightDirection.y += 0.1f;
 			}
 			if (_inputManager->IsKeyDone(DIK_NUMPAD7))
 			{
-				directionalLightDirection.z -= 0.1f;
+				lightDirection.z -= 0.1f;
 			}
 			if (_inputManager->IsKeyDone(DIK_NUMPAD9))
 			{
-				directionalLightDirection.z += 0.1f;
+				lightDirection.z += 0.1f;
 			}
 
-			D3DXVec3Normalize(&directionalLightDirection, &directionalLightDirection);
+			// World computation
+			D3DXVec3Normalize(&lightDirection, &lightDirection);
 
 			At = CameraPosition + CameraDirection;
 
@@ -533,17 +563,17 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			// Reflection matrix
 			D3DXVECTOR3 CameraPositionReflected = CameraPosition;
 			D3DXVECTOR3 CameraDirectionReflected = CameraDirection;
-			CameraPositionReflected.y = -CameraPositionReflected.y + (waterHeight * 1);
-			CameraDirectionReflected.y = CameraDirectionReflected.y + (waterHeight * 1);
+			CameraPositionReflected.y = -CameraPositionReflected.y + (waterHeight * 2);
+			CameraDirectionReflected.y = -CameraDirectionReflected.y;
 			D3DXVECTOR3 AtReflected = CameraPositionReflected + CameraDirectionReflected;
-			D3DXVECTOR3 UpReflected(0, 1, 1);
+			D3DXVECTOR3 UpReflected(0, 1, 0);
 			D3DXMatrixLookAtLH(&ReflectionMatrix, &CameraPositionReflected, &AtReflected, &Up);
 
 			D3DXMATRIX WorldViewProjReflected = World * ReflectionMatrix * Projection;
 
 			WorldViewProj = World * View * Projection;
 
-			// Do a lot of thing like draw triangles with DirectX
+			// Draw calls
 			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
 			device->BeginScene();
 
@@ -552,24 +582,23 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 			unsigned int cPasses, iPass;
 
+			/*
 			LPDIRECT3DSURFACE9 savedRenderTarget;
 			LPDIRECT3DSURFACE9 reflectionRenderTarget;
 
 			// Create reflected texture
-			device->CreateTexture(m_sizeX, m_sizeZ, 0, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pReflectionTexture, NULL);
+			device->CreateTexture(1024, 1024, 0, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pReflectionTexture, NULL);
 			pReflectionTexture->GetSurfaceLevel(0, &reflectionRenderTarget);
 			device->GetRenderTarget(0, &savedRenderTarget);
 
 			device->SetRenderTarget(0, reflectionRenderTarget);
-			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
-
+			//device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
 
 			// "Send" WorldViewProj matrix to shader
 			pEffect->SetMatrix(hWorldViewProj, &WorldViewProjReflected);
 
 			// Set texture
 			pEffect->SetTexture(hTexture, pTexture);
-
 			pEffect->SetVector(hCameraDirection, new D3DXVECTOR4(CameraDirectionReflected, 0));
 
 			// Draw map
@@ -592,16 +621,16 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 			device->SetRenderTarget(0, savedRenderTarget);
 
-			void *pContainer;
-			HRESULT hr = reflectionRenderTarget->GetContainer(IID_IDirect3DTexture9, &pContainer);
-			if (SUCCEEDED(hr) && pContainer)
-			{
-				pReflectionTexture = (IDirect3DTexture9 *) pContainer;
-			}
-
+			
+			//void *pContainer;
+			//HRESULT hr = reflectionRenderTarget->GetContainer(IID_IDirect3DTexture9, &pContainer);
+			//if (SUCCEEDED(hr) && pContainer)
+			//{
+			//	pReflectionTexture = (IDirect3DTexture9 *) pContainer;
+			//}
+			
 
 			// Draw Water
-			pEffectWater->SetMatrix(hWorldViewProjMatrixWater, &WorldViewProj);
 			pEffectWater->SetMatrix(hWorldMatrixWater, &World);
 			pEffectWater->SetMatrix(hViewMatrixWater, &View);
 			pEffectWater->SetMatrix(hProjectionMatrixWater, &Projection);
@@ -625,8 +654,9 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			}
 
 			pEffectWater->End();
-
-			// Draw without lights
+			*/
+			
+			// Draw terrain without lights
 			if (!enableLights)
 			{
 				// "Send" WorldViewProj matrix to shader
@@ -665,8 +695,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 				pEffectLights->SetTexture(hTextureLights, pTexture);
 
 				// Directional light
-				pEffectLights->SetVector(hDirectionalLightColor, &directionalLightColor);
-				pEffectLights->SetVector(hDirectionalLightDirection, new D3DXVECTOR4(directionalLightDirection, 0));
+				pEffectLights->SetVector(hDirectionalLightColor, &diffuseColor);
+				pEffectLights->SetVector(hlightDirection, new D3DXVECTOR4(lightDirection, 0));
 
 				pEffectLights->SetVector(hCameraDirection, new D3DXVECTOR4(CameraDirection, 0));
 
@@ -693,6 +723,33 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 				pEffectLights->End();
 			}
+
+			// Draw water with refraction
+			pEffectRefraction->SetMatrix(hWorldMatrixRefraction, &World);
+			pEffectRefraction->SetMatrix(hViewMatrixRefraction, &View);
+			pEffectRefraction->SetMatrix(hProjectionMatrixRefraction, &Projection);
+			pEffectRefraction->SetTexture(hShaderTextureRefraction, pTexture);
+			pEffectRefraction->SetVector(hAmbiantColorRefraction, &ambientColor);
+			pEffectRefraction->SetVector(hDiffuseColorRefraction, &diffuseColor);
+			pEffectRefraction->SetFloatArray(hLightDirectionRefraction, (float*)&lightDirection, 3);
+			pEffectRefraction->SetVector(hClipPlaneRefraction, &clipPlane);
+
+			device->SetStreamSource(0, pWaterVertexBuffer, 0, sizeof(Vertex));
+			device->SetIndices(pWaterIndexBuffer);
+
+			cPasses = 0, iPass = 0;
+			pEffectRefraction->Begin(&cPasses, 0);
+			for (iPass = 0; iPass < cPasses; ++iPass)
+			{
+				pEffectRefraction->BeginPass(iPass);
+				pEffectRefraction->CommitChanges();
+
+				device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 2 * (m_sizeX * m_sizeZ), 0, 2 * ((m_sizeX * m_sizeZ) - 1));
+
+				pEffectRefraction->EndPass();
+			}
+
+			pEffectRefraction->End();
 
 
 			device->EndScene();
