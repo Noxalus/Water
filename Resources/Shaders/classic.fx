@@ -1,4 +1,6 @@
-shared float4x4 WorldViewProj;
+shared matrix WorldMatrix;
+shared matrix ViewMatrix;
+shared matrix ProjectionMatrix;
 shared Texture2D Texture;
 shared float4 LightColor;
 shared float3 LightDirection;
@@ -37,7 +39,14 @@ VertexOutput VertexMain(VertexInput input)
 {
 	VertexOutput output;
 
-	output.Position = mul(float4(input.Position, 1.0f), WorldViewProj);
+	// Change the position vector to be 4 units for proper matrix calculations.
+	float4 position = float4(input.Position, 1.0f);
+
+	// Calculate the position of the vertex against the world, view, and projection matrices.
+	output.Position = mul(position, WorldMatrix);
+	output.Position = mul(output.Position, ViewMatrix);
+	output.Position = mul(output.Position, ProjectionMatrix);
+
 	output.UV = input.UV;
 	output.Normal = input.Normal;
 

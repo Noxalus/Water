@@ -1,12 +1,12 @@
 // Globals
-matrix WorldMatrix;
-matrix ViewMatrix;
-matrix ProjectionMatrix;
-Texture2D ShaderTexture;
-float4 AmbientColor;
-float4 DiffuseColor;
-float3 LightDirection;
-float4 ClipPlane;
+shared matrix WorldMatrix;
+shared matrix ViewMatrix;
+shared matrix ProjectionMatrix;
+shared Texture2D ShaderTexture;
+shared float4 AmbientColor;
+shared float4 DiffuseColor;
+shared float3 LightDirection;
+shared float4 ClipPlane;
 
 // Samples
 sampler2D SampleType = sampler_state
