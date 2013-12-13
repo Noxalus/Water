@@ -95,7 +95,7 @@ float4 PixelMain(PixelInputType input) : COLOR0
 	// Multiply the texture pixel and the input color to get the final result.
 	color = color * textureColor;
 	
-	return color;
+	return textureColor;
 }
 
 // Technique

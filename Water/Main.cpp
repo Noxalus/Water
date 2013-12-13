@@ -71,7 +71,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	_inputManager = new InputManager();
 	_inputManager->Create(hInstance, hWnd);
 
-	D3DCOLOR backgroundColor = D3DCOLOR_RGBA(0, 0, 0, 0);
+	D3DCOLOR backgroundColor = D3DCOLOR_RGBA(1, 0, 0, 1);
 	DWORD fillMode = D3DFILL_SOLID;
 
 	// Lights
@@ -83,11 +83,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	// Directional light
 	D3DXVECTOR3 lightDirection = D3DXVECTOR3(-1, 0, 0);
 	D3DXVECTOR4 diffuseColor = D3DXVECTOR4(1.0f, 1.0f, 1.0f, 1.0f);
-
-	// Omni light
-	D3DXVECTOR4 *omniLightPositions = new D3DXVECTOR4[1]{ D3DXVECTOR4(0, 15, 10, 0) };
-	D3DXVECTOR4 *omniLightColors = new D3DXVECTOR4[1]{ D3DXVECTOR4(255, 0, 0, 0) };
-	float omniLightDistance = 10;
 
 	// World matrix
 	D3DXMATRIX World;
@@ -143,28 +138,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 	IDirect3DDevice9 *device;
 	pD3D->CreateDevice(0, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &device);
-
-	/*
-	// Nvidia debug
-	D3DDEVTYPE DeviceType = D3DDEVTYPE_HAL;
-	int num_card = 0;
-	// Look for 'NVIDIA PerfHUD' adapter
-	// If it is present, override default settings
-	for (unsigned int adapter = 0; adapter < pD3D->GetAdapterCount();
-	adapter++)
-	{
-	D3DADAPTER_IDENTIFIER9 identifier;
-	HRESULT Res;
-	Res = pD3D->GetAdapterIdentifier(adapter, 0, &identifier);
-	if (strstr(identifier.Description, "PerfHUD") != 0)
-	{
-	num_card = adapter;
-	DeviceType = D3DDEVTYPE_REF;
-	break;
-	}
-	}
-	*/
-
+	
 	//Create and fill other DirectX Stuffs like Vertex/Index buffer, shaders  
 
 	// Vertex declaration
@@ -209,7 +183,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			float heightValue = m_height[z + (m_sizeX * x)];
 
 			pMapVertexData[i].Position = D3DXVECTOR3(z, heightValue, x);
-			pMapVertexData[i].TextCoord = D3DXVECTOR2(((float) z / (float) m_sizeX), 1 - ((float) x / (float) m_sizeZ));
+			pMapVertexData[i].TextCoord = D3DXVECTOR2(((float) z / (float) m_sizeZ), 1 - ((float) x / (float) m_sizeX));
 
 			const D3DXVECTOR3& pos = pMapVertexData[i].Position;
 			pMapVertexData[i].Normal.x = 0.0f;
@@ -283,6 +257,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	pMapIndexBuffer->Unlock();
 
 	/** Vertex & Index buffers (Water) **/
+
 	// Load texture
 	LPCWSTR pWaterTextureFile = L"../Resources/water.dds";
 
@@ -297,64 +272,47 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	// Setup a clipping plane based on the height of the water to clip everything above it.
 	D3DXVECTOR4 clipPlane = D3DXVECTOR4(0.0f, -1.0f, 0.0f, waterHeight + 0.1f);
 	IDirect3DVertexBuffer9* pWaterVertexBuffer;
-	device->CreateVertexBuffer((m_sizeX * m_sizeZ) * sizeof(Vertex), 0, 0, D3DPOOL_DEFAULT, &pWaterVertexBuffer, NULL);
+	device->CreateVertexBuffer(3 * sizeof(Vertex), 0, 0, D3DPOOL_DEFAULT, &pWaterVertexBuffer, NULL);
 
 	Vertex* pWaterVertexData;
 
 	pWaterVertexBuffer->Lock(0, 0, (void**) &pWaterVertexData, 0);
 
-	i = 0;
-	for (int z = 0; z < m_sizeX; z++)
-	{
-		for (int x = 0; x < m_sizeZ; x++)
-		{
-			i = z + (m_sizeX * x);
-			float heightValue = m_height[z + (m_sizeX * x)];
+	pWaterVertexData[0].Position = D3DXVECTOR3(0, waterHeight, 0);
+	pWaterVertexData[0].TextCoord = D3DXVECTOR2(0, 1);
+	pWaterVertexData[0].Normal = D3DXVECTOR3(0, 0, 0);
 
-			pWaterVertexData[i].Position = D3DXVECTOR3(z, waterHeight, x);
-			pWaterVertexData[i].TextCoord = D3DXVECTOR2(((float) z / (float) m_sizeX), 1 - ((float) x / (float) m_sizeZ));
+	pWaterVertexData[1].Position = D3DXVECTOR3(0, waterHeight, m_sizeZ);
+	pWaterVertexData[1].TextCoord = D3DXVECTOR2(0, 0);
+	pWaterVertexData[1].Normal = D3DXVECTOR3(0, 0, 0);
 
-			// Normals
-			pWaterVertexData[i].Normal.x = 0.0f;
-			pWaterVertexData[i].Normal.y = 0.0f;
-			pWaterVertexData[i].Normal.z = 0.0f;
-		}
-	}
+	pWaterVertexData[2].Position = D3DXVECTOR3(m_sizeX, waterHeight, m_sizeZ);
+	pWaterVertexData[2].TextCoord = D3DXVECTOR2(1, 0);
+	pWaterVertexData[2].Normal = D3DXVECTOR3(0, 0, 0);
+
+	pWaterVertexData[3].Position = D3DXVECTOR3(m_sizeX, waterHeight, 0);
+	pWaterVertexData[3].TextCoord = D3DXVECTOR2(1, 1);
+	pWaterVertexData[3].Normal = D3DXVECTOR3(0, 0, 0);
 
 	pWaterVertexBuffer->Unlock();
 
 	// Index buffer
 	IDirect3DIndexBuffer9* pWaterIndexBuffer;
-	device->CreateIndexBuffer(6 * (m_sizeX * m_sizeZ) * sizeof(int), 0, D3DFMT_INDEX32, D3DPOOL_DEFAULT, &pWaterIndexBuffer, NULL);
+	device->CreateIndexBuffer(6 * sizeof(int), 0, D3DFMT_INDEX32, D3DPOOL_DEFAULT, &pWaterIndexBuffer, NULL);
 
 	int* pWaterIndexData;
 	pWaterIndexBuffer->Lock(0, 0, (void**) &pWaterIndexData, 0);
 
-
-	counter = 0;
-	for (int y = 0; y < m_sizeZ - 1; y++)
-	{
-		for (int x = 0; x < m_sizeX - 1; x++)
-		{
-			// First triangle
-			pWaterIndexData[counter] = x + (m_sizeX * (y + 1));
-			counter++;
-			pWaterIndexData[counter] = (x + 1) + (m_sizeX * y);
-			counter++;
-			pWaterIndexData[counter] = x + (m_sizeX * y);
-			counter++;
-
-			// Second triangle
-			pWaterIndexData[counter] = (x + 1) + (m_sizeX * (y + 1));
-			counter++;
-			pWaterIndexData[counter] = (x + 1) + (m_sizeX * y);
-			counter++;
-			pWaterIndexData[counter] = x + (m_sizeX * (y + 1));
-			counter++;
-		}
-	}
+	pWaterIndexData[0] = 0;
+	pWaterIndexData[1] = 1;
+	pWaterIndexData[2] = 2;
+	pWaterIndexData[3] = 2;
+	pWaterIndexData[4] = 3;
+	pWaterIndexData[5] = 0;
 
 	pWaterIndexBuffer->Unlock();
+
+	/*** Shaders ***/
 
 	// Classic shader
 	LPCWSTR pFxFile = L"../Resources/Shaders/classic.fx";
@@ -560,6 +518,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			D3DXMatrixIdentity(&World);
 
 			// Reflection matrix
+			/*
 			D3DXVECTOR3 CameraPositionReflected = CameraPosition;
 			D3DXVECTOR3 CameraDirectionReflected = CameraDirection;
 			CameraPositionReflected.y = -CameraPositionReflected.y + (waterHeight * 2);
@@ -567,13 +526,15 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			D3DXVECTOR3 AtReflected = CameraPositionReflected + CameraDirectionReflected;
 			D3DXVECTOR3 UpReflected(0, 1, 0);
 			D3DXMatrixLookAtLH(&ReflectionMatrix, &CameraPositionReflected, &AtReflected, &Up);
+			*/
 
 			// Draw calls
-			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
-			
 
 			// Set device vertex declaration
 			device->SetVertexDeclaration(pDecl);
+
+			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
+			device->BeginScene();
 
 			unsigned int cPasses, iPass;
 
@@ -655,8 +616,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			LPDIRECT3DSURFACE9 refractionRenderTarget = NULL;
 			
 			// Create refraction texture
-			/*
-			device->CreateTexture(256, 256, 1, D3DUSAGE_RENDERTARGET, 
+			device->CreateTexture(1024, 1024, 1, D3DUSAGE_RENDERTARGET, 
 				D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pRefractionTexture, NULL);
 
 			pRefractionTexture->GetSurfaceLevel(0, &refractionRenderTarget);
@@ -664,12 +624,9 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 			device->SetRenderTarget(0, refractionRenderTarget);
 			refractionRenderTarget->Release();
-			*/
-			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
-			device->BeginScene();
 
+			
 
-			/*
 			// Set shader parameters
 
 			// World, View and Projection matrix
@@ -684,7 +641,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			device->SetStreamSource(0, pMapVertexBuffer, 0, sizeof(Vertex));
 			device->SetIndices(pMapIndexBuffer);
 
-
 			cPasses = 0, iPass = 0;
 			pEffect->Begin(&cPasses, 0);
 			for (iPass = 0; iPass < cPasses; ++iPass)
@@ -698,44 +654,11 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			}
 			pEffect->End();
 
-			device->EndScene();
-
 			device->SetRenderTarget(0, savedRenderTarget);
 			savedRenderTarget->Release();
-
+			
 			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
 			device->BeginScene();
-
-			// Draw water with refraction
-			pEffectRefraction->SetMatrix(hWorldMatrixRefraction, &World);
-			pEffectRefraction->SetMatrix(hViewMatrixRefraction, &View);
-			pEffectRefraction->SetMatrix(hProjectionMatrixRefraction, &Projection);
-			pEffectRefraction->SetTexture(hShaderTextureRefraction, pRefractionTexture);
-			pEffectRefraction->SetVector(hAmbientColorRefraction, &ambientColor);
-			pEffectRefraction->SetVector(hDiffuseColorRefraction, &diffuseColor);
-			pEffectRefraction->SetFloatArray(hLightDirectionRefraction, (float*) &lightDirection, 3);
-			pEffectRefraction->SetVector(hClipPlaneRefraction, &clipPlane);
-
-			device->SetStreamSource(0, pWaterVertexBuffer, 0, sizeof(Vertex));
-			device->SetIndices(pWaterIndexBuffer);
-
-			cPasses = 0, iPass = 0;
-			pEffectRefraction->Begin(&cPasses, 0);
-			for (iPass = 0; iPass < cPasses; ++iPass)
-			{
-				pEffectRefraction->BeginPass(iPass);
-				pEffectRefraction->CommitChanges();
-
-				device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 2 * (m_sizeX * m_sizeZ), 0, 2 * ((m_sizeX * m_sizeZ) - 1));
-
-				pEffectRefraction->EndPass();
-			}
-
-			pEffectRefraction->End();
-			*/
-
-
-
 
 			// Draw terrain without lights
 			if (!enableLights)
@@ -803,6 +726,33 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 				pEffectLights->End();
 			}
+
+			// Draw water with refraction
+			pEffectRefraction->SetMatrix(hWorldMatrixRefraction, &World);
+			pEffectRefraction->SetMatrix(hViewMatrixRefraction, &View);
+			pEffectRefraction->SetMatrix(hProjectionMatrixRefraction, &Projection);
+			pEffectRefraction->SetTexture(hShaderTextureRefraction, pTexture);
+			pEffectRefraction->SetVector(hAmbientColorRefraction, &ambientColor);
+			pEffectRefraction->SetVector(hDiffuseColorRefraction, &diffuseColor);
+			pEffectRefraction->SetFloatArray(hLightDirectionRefraction, (float*) &lightDirection, 3);
+			pEffectRefraction->SetVector(hClipPlaneRefraction, &clipPlane);
+
+			device->SetStreamSource(0, pWaterVertexBuffer, 0, sizeof(Vertex));
+			device->SetIndices(pWaterIndexBuffer);
+
+			cPasses = 0, iPass = 0;
+			pEffectRefraction->Begin(&cPasses, 0);
+			for (iPass = 0; iPass < cPasses; ++iPass)
+			{
+				pEffectRefraction->BeginPass(iPass);
+				pEffectRefraction->CommitChanges();
+
+				device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 4, 0, 2);
+
+				pEffectRefraction->EndPass();
+			}
+
+			pEffectRefraction->End();
 
 			device->EndScene();
 			device->Present(NULL, NULL, NULL, NULL);
