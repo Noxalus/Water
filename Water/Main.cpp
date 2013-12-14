@@ -71,7 +71,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 	_inputManager = new InputManager();
 	_inputManager->Create(hInstance, hWnd);
 
-	D3DCOLOR backgroundColor = D3DCOLOR_RGBA(1, 0, 0, 1);
+	D3DCOLOR backgroundColor = D3DCOLOR_RGBA(255, 0, 0, 1);
 	DWORD fillMode = D3DFILL_SOLID;
 
 	// Lights
@@ -525,15 +525,17 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 			/** Draw calls **/
 
-			// Set device vertex declaration
-			device->SetVertexDeclaration(pDecl);
 			unsigned int cPasses, iPass;
 
-			device->BeginScene();
 			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
+			device->BeginScene();
+
+			// Set device vertex declaration
+			device->SetVertexDeclaration(pDecl);
 
 			LPDIRECT3DSURFACE9 savedRenderTarget = NULL;
 			LPDIRECT3DSURFACE9 refractionRenderTarget = NULL;
+			LPDIRECT3DSURFACE9 depthStencilSurface = LPDIRECT3DSURFACE9();
 
 			// Create refraction texture
 			device->CreateTexture(1024, 1024, 1, D3DUSAGE_RENDERTARGET,
@@ -544,6 +546,11 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 			device->SetRenderTarget(0, refractionRenderTarget);
 			refractionRenderTarget->Release();
+
+			device->CreateDepthStencilSurface(1024, 1024, D3DFMT_D32F_LOCKABLE, D3DMULTISAMPLE_NONE, 0, false, &depthStencilSurface, NULL);
+			device->SetDepthStencilSurface(depthStencilSurface);
+
+			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(0, 40, 100), 1.0f, 0);
 
 			// Set shader parameters
 
@@ -580,7 +587,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			device->SetRenderTarget(0, savedRenderTarget);
 			savedRenderTarget->Release();
 			
-			//device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, backgroundColor, 1.0f, 0);
+			device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, D3DCOLOR_XRGB(0, 255, 0), 1.0f, 0);
 
 			// Draw terrain without lights
 			if (!enableLights)
